@@ -197,7 +197,57 @@ void QVGraphicsView::wheelEvent(QWheelEvent *event)
 #endif
 
     const bool modifierPressed = event->modifiers().testFlag(Qt::ControlModifier);
-    bool dontZoom = qvGetSettingInt(ScrollZoom) == 2;
+    const int scrollZoomMode = qvGetSettingInt(ScrollZoom);
+
+    // Check if change image mode is selected (mode 3)
+    if (scrollZoomMode == 3) {
+        // If Ctrl is pressed, temporarily switch to zoom mode
+        if (modifierPressed) {
+            // Use zoom mode (0 = always zoom)
+            bool dontZoom = false;
+            bool touchDeviceDetected = false;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            // Auto-detect touchpad for zoom
+            touchDeviceDetected = event->device()->type() == QInputDevice::DeviceType::TouchPad
+                    || event->device()->type() == QInputDevice::DeviceType::TouchScreen;
+            touchDeviceDetected = touchDeviceDetected && event->phase() != Qt::NoScrollPhase;
+#endif
+
+            const int yDelta = event->angleDelta().y();
+            const qreal yScale = 120.0;
+
+            if (yDelta == 0)
+                return;
+
+            const qreal zoomAmountPerWheelClick = qvGetSettingInt(ScaleFactor)/100.0;
+            qreal zoomFactor = zoomAmountPerWheelClick;
+            if (qvGetSettingBool(FractionalZoom) || touchDeviceDetected) {
+                const qreal fractionalWheelClicks = qFabs(yDelta) / yScale;
+                zoomFactor *= fractionalWheelClicks;
+            }
+            zoomFactor += 1.0;
+
+            if (yDelta < 0)
+                zoomFactor = qPow(zoomFactor, -1);
+
+            zoom(zoomFactor, eventPos);
+        } else {
+            // Change image mode: up wheel = previous, down wheel = next
+            const int yDelta = event->angleDelta().y();
+
+            if (yDelta == 0)
+                return;
+
+            if (yDelta > 0)
+                goToFile(GoToFileMode::previous);
+            else
+                goToFile(GoToFileMode::next);
+        }
+        return;
+    }
+
+    // Original logic for modes 0, 1, 2
+    bool dontZoom = scrollZoomMode == 2;
     if (modifierPressed) {
         dontZoom = !dontZoom;
     }
@@ -209,7 +259,7 @@ void QVGraphicsView::wheelEvent(QWheelEvent *event)
             || event->device()->type() == QInputDevice::DeviceType::TouchScreen;
     // Real touchpads are likely to exhibit these characteristics in empirical testing
     touchDeviceDetected = touchDeviceDetected && event->phase() != Qt::NoScrollPhase;
-    if (touchDeviceDetected && qvGetSettingInt(ScrollZoom) == 1) {
+    if (touchDeviceDetected && scrollZoomMode == 1) {
         // If this is a touch device, override setting
         dontZoom = !modifierPressed;
     }
