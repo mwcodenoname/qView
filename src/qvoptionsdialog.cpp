@@ -496,6 +496,6 @@ void QVOptionsDialog::languageComboBoxCurrentIndexChanged(int index)
 
 void QVOptionsDialog::scrollZoomsComboBoxCurrentIndexChanged(int index)
 {
-    const bool zoomScrollEnabled = index != 2;
+    const bool zoomScrollEnabled = index != 2 && index != 3;
     ui->fractionalZoomCheckbox->setEnabled(zoomScrollEnabled);
 }
