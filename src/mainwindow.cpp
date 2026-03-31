@@ -845,15 +845,31 @@ void MainWindow::deleteFile(bool permanent)
         success = file.moveToTrash();
         if (success)
             trashFilePath = file.fileName();
-#elif defined Q_OS_MACOS && COCOA_LOADED
-        QString trashedFile = QVCocoaFunctions::deleteFile(filePath);
-        success = !trashedFile.isEmpty();
-        if (success)
-            trashFilePath = QUrl(trashedFile).toLocalFile(); // remove file:// protocol
-#elif defined Q_OS_UNIX && !defined Q_OS_MACOS
+        else
+        {
+            qWarning() << "QFile::moveToTrash() failed for:" << filePath;
+        }
+#endif
+
+#if defined Q_OS_MACOS && COCOA_LOADED
+        // On macOS, fall back to native Cocoa implementation if Qt method failed
+        if (!success)
+        {
+            QString trashedFile = QVCocoaFunctions::deleteFile(filePath);
+            success = !trashedFile.isEmpty();
+            if (success)
+                trashFilePath = QUrl(trashedFile).toLocalFile(); // remove file:// protocol
+            else
+            {
+                qWarning() << "QVCocoaFunctions::deleteFile() also failed for:" << filePath;
+            }
+        }
+#elif defined Q_OS_UNIX && !defined Q_OS_MACOS && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
         trashFilePath = deleteFileLinuxFallback(filePath, false);
         success = !trashFilePath.isEmpty();
-#else
+#endif
+
+#if (QT_VERSION < QT_VERSION_CHECK(5, 15, 0)) && !(defined Q_OS_MACOS && COCOA_LOADED) && !(defined Q_OS_UNIX && !defined Q_OS_MACOS)
         QMessageBox::critical(this, tr("Not Supported"), tr("This program was compiled with an old version of Qt and this feature is not available.\n"
                                                             "If you see this message, please report a bug!"));
 
